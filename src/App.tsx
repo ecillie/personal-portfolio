@@ -164,7 +164,7 @@ function ProjectLinks({ project }: { project: Project }) {
 
 function FeaturedProjectCard({ project }: { project: Project }) {
   return (
-    <article className="featured-project-card">
+    <article className="featured-project-card" data-log-section={project.title}>
       <Link className="project-visual-link" to={`/projects/${project.slug}`} aria-label={`View ${project.title} case study`}>
         <ProjectVisual project={project} />
       </Link>
@@ -508,7 +508,7 @@ function ResumePage() {
         <div><p className="kicker">Resumes</p><h1>Find the right version.</h1></div>
         <p>Choose a resume to preview it here, or download a copy when you&apos;re ready to share.</p>
       </section>
-      <section className="resume-panel shell">
+      <section className="resume-panel shell" data-log-section="Resume preview">
         <div className="resume-controls">
           <div className="resume-controls-label"><span className="status-dot" /><span>Viewing <strong>{preview?.label ?? 'Resume'}</strong></span></div>
           <nav className="resume-options" aria-label="Choose a resume to preview">
@@ -517,6 +517,8 @@ function ResumePage() {
                 className={`resume-select ${preview?.filename === resume.filename ? 'is-selected' : ''}`}
                 type="button"
                 aria-pressed={preview?.filename === resume.filename}
+                data-log-label={resume.label}
+                data-log-action="select resume preview"
                 onClick={() => setSelectedFilename(resume.filename)}
                 key={resume.filename}
               >
@@ -524,7 +526,7 @@ function ResumePage() {
               </button>
             ))}
           </nav>
-          {preview ? <a className="resume-download" href={`/resumes/${preview.filename}`} download>Download PDF <span aria-hidden="true">↓</span></a> : null}
+          {preview ? <a className="resume-download" href={`/resumes/${preview.filename}`} data-log-label={`Download ${preview.label} PDF`} download>Download PDF <span aria-hidden="true">↓</span></a> : null}
         </div>
         <div className="resume-preview">{preview ? <iframe className="resume-frame" src={`/resumes/${preview.filename}`} title={`${preview.name} — ${preview.label}`} /> : null}</div>
       </section>
