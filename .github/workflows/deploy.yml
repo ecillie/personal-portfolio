@@ -1,0 +1,83 @@
+name: Test and Deploy
+
+# Tests run on every pull request into main. When a PR is merged (a push to
+# main) and the tests pass, the built site is deployed to the Oracle server.
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+      - run: npm run lint
+      - run: npm test
+      - run: npm run build
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist
+          retention-days: 7
+
+  deploy:
+    needs: test
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    # Records each deploy under the repo's Deployments section. Set the
+    # SITE_URL repository variable to link to the live site from there.
+    environment:
+      name: production
+      url: ${{ vars.SITE_URL }}
+    env:
+      SSH_USER: ${{ vars.SSH_USER || 'ubuntu' }}
+      DEPLOY_PATH: ${{ vars.DEPLOY_PATH || '/var/www/html' }}
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist
+
+      - name: Configure SSH
+        env:
+          SSH_KEY: ${{ secrets.SSH_KEY }}
+          IP_ADDRESS: ${{ secrets.IP_ADDRESS }}
+        run: |
+          mkdir -p ~/.ssh
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -H "$IP_ADDRESS" >> ~/.ssh/known_hosts
+
+      - name: Upload site
+        env:
+          IP_ADDRESS: ${{ secrets.IP_ADDRESS }}
+        run: |
+          SSH="ssh -i ~/.ssh/deploy_key"
+          REMOTE="$SSH_USER@$IP_ADDRESS"
+          $SSH "$REMOTE" "mkdir -p '$DEPLOY_PATH'"
+          # logging-config.json is meant to be edited on the server, so only
+          # copy it the first time and never overwrite or delete it afterwards.
+          rsync -az --delete --exclude logging-config.json -e "$SSH" dist/ "$REMOTE:$DEPLOY_PATH/"
+          rsync -az --ignore-existing -e "$SSH" dist/logging-config.json "$REMOTE:$DEPLOY_PATH/"
+
+      - name: Clean up key
+        if: always()
+        run: rm -f ~/.ssh/deploy_key
