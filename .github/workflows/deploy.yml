@@ -72,20 +72,10 @@ jobs:
       url: ${{ vars.SITE_URL }}
     env:
       SSH_USER: ${{ vars.SSH_USER || 'ubuntu' }}
-      DEPLOY_PATH: ${{ vars.DEPLOY_PATH || '/var/www/html' }}
+      # The git clone on the server that the site is built and served from.
+      DEPLOY_PATH: ${{ vars.DEPLOY_PATH || '/home/ubuntu/personal-portfolio' }}
+      SHA: ${{ needs.automerge.outputs.sha }}
     steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: ${{ needs.automerge.outputs.sha }}
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: npm
-
-      - run: npm ci
-      - run: npm run build
-
       - name: Configure SSH
         env:
           SSH_KEY: ${{ secrets.SSH_KEY }}
@@ -96,17 +86,26 @@ jobs:
           chmod 600 ~/.ssh/deploy_key
           ssh-keyscan -H "$IP_ADDRESS" >> ~/.ssh/known_hosts
 
-      - name: Upload site
+      - name: Update and build on server
         env:
           IP_ADDRESS: ${{ secrets.IP_ADDRESS }}
         run: |
-          SSH="ssh -i ~/.ssh/deploy_key"
-          REMOTE="$SSH_USER@$IP_ADDRESS"
-          $SSH "$REMOTE" "mkdir -p '$DEPLOY_PATH'"
-          # logging-config.json is meant to be edited on the server, so only
-          # copy it the first time and never overwrite or delete it afterwards.
-          rsync -az --delete --exclude logging-config.json -e "$SSH" dist/ "$REMOTE:$DEPLOY_PATH/"
-          rsync -az --ignore-existing -e "$SSH" dist/logging-config.json "$REMOTE:$DEPLOY_PATH/"
+          ssh -i ~/.ssh/deploy_key "$SSH_USER@$IP_ADDRESS" bash -s -- "$DEPLOY_PATH" "$SHA" <<'EOF'
+          set -euo pipefail
+          cd "$1"
+          git fetch --prune origin
+          # Fails rather than discarding any uncommitted changes on the server.
+          git checkout -B Prod "$2"
+          git branch --set-upstream-to=origin/Prod Prod
+          # logging-config.json is meant to be edited in dist on the server,
+          # so keep the server's copy across rebuilds.
+          keep=$(mktemp)
+          if [ -f dist/logging-config.json ]; then cp dist/logging-config.json "$keep"; fi
+          npm ci
+          npm run build
+          if [ -s "$keep" ]; then cp "$keep" dist/logging-config.json; fi
+          rm -f "$keep"
+          EOF
 
       - name: Clean up key
         if: always()
