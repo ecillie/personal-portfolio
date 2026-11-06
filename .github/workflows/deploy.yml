@@ -1,10 +1,17 @@
 name: Test and Deploy
 
-# Tests run on every pull request into Prod. When a PR is merged (a push to
-# Prod) and the tests pass, the built site is deployed to the Oracle server.
+# Every pull request into Prod is tested. If the tests pass, the PR is merged
+# automatically, and the merged commit is tested again and deployed to the
+# Oracle server. Nothing is deployed unless it is merged into Prod and its
+# tests pass.
+#
+# Merges made by this workflow use GITHUB_TOKEN, which does not start a new
+# push run, so the deploy happens in the same run as the merge. The push
+# trigger covers changes that reach Prod any other way.
 on:
   pull_request:
     branches: [Prod]
+    types: [opened, synchronize, reopened, ready_for_review]
   push:
     branches: [Prod]
   workflow_dispatch:
@@ -32,16 +39,43 @@ jobs:
       - run: npm test
       - run: npm run build
 
-      - uses: actions/upload-artifact@v4
-        with:
-          name: dist
-          path: dist
-          retention-days: 7
+  automerge:
+    needs: test
+    # Skips drafts and PRs from forks.
+    if: >-
+      github.event_name == 'pull_request' &&
+      !github.event.pull_request.draft &&
+      github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    outputs:
+      sha: ${{ steps.merge.outputs.sha }}
+    steps:
+      - name: Merge pull request
+        id: merge
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          PR: ${{ github.event.pull_request.number }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          # Only merge the exact commit that was tested.
+          gh pr merge "$PR" --merge --match-head-commit "$HEAD_SHA"
+          echo "sha=$(gh pr view "$PR" --json mergeCommit --jq .mergeCommit.oid)" >> "$GITHUB_OUTPUT"
 
   deploy:
-    needs: test
-    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/Prod'
+    needs: [test, automerge]
+    if: >-
+      always() &&
+      needs.test.result == 'success' &&
+      (needs.automerge.result == 'success' ||
+       (github.event_name != 'pull_request' && github.ref == 'refs/heads/Prod'))
     runs-on: ubuntu-latest
+    concurrency:
+      group: production
+      cancel-in-progress: false
     # Records each deploy under the repo's Deployments section. Set the
     # SITE_URL repository variable to link to the live site from there.
     environment:
@@ -51,10 +85,21 @@ jobs:
       SSH_USER: ${{ vars.SSH_USER || 'ubuntu' }}
       DEPLOY_PATH: ${{ vars.DEPLOY_PATH || '/var/www/html' }}
     steps:
-      - uses: actions/download-artifact@v4
+      - uses: actions/checkout@v4
         with:
-          name: dist
-          path: dist
+          ref: ${{ needs.automerge.outputs.sha || github.sha }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      # Test the merged commit itself, since Prod may have moved since the PR
+      # was tested.
+      - run: npm ci
+      - run: npm run lint
+      - run: npm test
+      - run: npm run build
 
       - name: Configure SSH
         env:
