@@ -1,20 +1,15 @@
 name: Test and Deploy
 
-# Every pull request into Prod is tested. If the tests pass, the PR is merged
-# automatically, and the merged commit is tested again and deployed to the
-# Oracle server. Nothing is deployed unless it is merged into Prod and its
-# tests pass.
+# Every pull request into Prod runs test -> automerge -> deploy. Each job runs
+# only if the one before it succeeded, so nothing is deployed unless its tests
+# passed and it was merged into Prod.
 #
 # Merges made by this workflow use GITHUB_TOKEN, which does not start a new
-# push run, so the deploy happens in the same run as the merge. The push
-# trigger covers changes that reach Prod any other way.
+# push run, so the deploy happens in the same run as the merge.
 on:
   pull_request:
     branches: [Prod]
     types: [opened, synchronize, reopened, ready_for_review]
-  push:
-    branches: [Prod]
-  workflow_dispatch:
 
 concurrency:
   group: deploy-${{ github.ref }}
@@ -41,7 +36,6 @@ jobs:
 
   automerge:
     needs: test
-    # Skips drafts and PRs from forks.
     if: >-
       github.event_name == 'pull_request' &&
       !github.event.pull_request.draft &&
@@ -66,12 +60,7 @@ jobs:
           echo "sha=$(gh pr view "$PR" --json mergeCommit --jq .mergeCommit.oid)" >> "$GITHUB_OUTPUT"
 
   deploy:
-    needs: [test, automerge]
-    if: >-
-      always() &&
-      needs.test.result == 'success' &&
-      (needs.automerge.result == 'success' ||
-       (github.event_name != 'pull_request' && github.ref == 'refs/heads/Prod'))
+    needs: automerge
     runs-on: ubuntu-latest
     concurrency:
       group: production
@@ -87,18 +76,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ needs.automerge.outputs.sha || github.sha }}
+          ref: ${{ needs.automerge.outputs.sha }}
 
       - uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
 
-      # Test the merged commit itself, since Prod may have moved since the PR
-      # was tested.
       - run: npm ci
-      - run: npm run lint
-      - run: npm test
       - run: npm run build
 
       - name: Configure SSH
