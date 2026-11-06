@@ -1,0 +1,113 @@
+name: Test and Deploy
+
+# Every pull request into Prod runs test -> automerge -> deploy. Each job runs
+# only if the one before it succeeded, so nothing is deployed unless its tests
+# passed and it was merged into Prod.
+#
+# Merges made by this workflow use GITHUB_TOKEN, which does not start a new
+# push run, so the deploy happens in the same run as the merge.
+on:
+  pull_request:
+    branches: [Prod]
+    types: [opened, synchronize, reopened, ready_for_review]
+
+concurrency:
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+      - run: npm run lint
+      - run: npm test
+      - run: npm run build
+
+  automerge:
+    needs: test
+    if: >-
+      github.event_name == 'pull_request' &&
+      !github.event.pull_request.draft &&
+      github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    outputs:
+      sha: ${{ steps.merge.outputs.sha }}
+    steps:
+      - name: Merge pull request
+        id: merge
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          PR: ${{ github.event.pull_request.number }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          # Only merge the exact commit that was tested.
+          gh pr merge "$PR" --merge --match-head-commit "$HEAD_SHA"
+          echo "sha=$(gh pr view "$PR" --json mergeCommit --jq .mergeCommit.oid)" >> "$GITHUB_OUTPUT"
+
+  deploy:
+    needs: automerge
+    runs-on: ubuntu-latest
+    concurrency:
+      group: production
+      cancel-in-progress: false
+    # Records each deploy under the repo's Deployments section. Set the
+    # SITE_URL repository variable to link to the live site from there.
+    environment:
+      name: production
+      url: ${{ vars.SITE_URL }}
+    env:
+      SSH_USER: ${{ vars.SSH_USER || 'ubuntu' }}
+      DEPLOY_PATH: ${{ vars.DEPLOY_PATH || '/var/www/html' }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.automerge.outputs.sha }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+      - run: npm run build
+
+      - name: Configure SSH
+        env:
+          SSH_KEY: ${{ secrets.SSH_KEY }}
+          IP_ADDRESS: ${{ secrets.IP_ADDRESS }}
+        run: |
+          mkdir -p ~/.ssh
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -H "$IP_ADDRESS" >> ~/.ssh/known_hosts
+
+      - name: Upload site
+        env:
+          IP_ADDRESS: ${{ secrets.IP_ADDRESS }}
+        run: |
+          SSH="ssh -i ~/.ssh/deploy_key"
+          REMOTE="$SSH_USER@$IP_ADDRESS"
+          $SSH "$REMOTE" "mkdir -p '$DEPLOY_PATH'"
+          # logging-config.json is meant to be edited on the server, so only
+          # copy it the first time and never overwrite or delete it afterwards.
+          rsync -az --delete --exclude logging-config.json -e "$SSH" dist/ "$REMOTE:$DEPLOY_PATH/"
+          rsync -az --ignore-existing -e "$SSH" dist/logging-config.json "$REMOTE:$DEPLOY_PATH/"
+
+      - name: Clean up key
+        if: always()
+        run: rm -f ~/.ssh/deploy_key
