@@ -1,12 +1,12 @@
 name: Test and Deploy
 
-# Tests run on every pull request into main. When a PR is merged (a push to
-# main) and the tests pass, the built site is deployed to the Oracle server.
+# Tests run on every pull request into Prod. When a PR is merged (a push to
+# Prod) and the tests pass, the built site is deployed to the Oracle server.
 on:
   pull_request:
-    branches: [main]
+    branches: [Prod]
   push:
-    branches: [main]
+    branches: [Prod]
   workflow_dispatch:
 
 concurrency:
@@ -40,7 +40,7 @@ jobs:
 
   deploy:
     needs: test
-    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/Prod'
     runs-on: ubuntu-latest
     # Records each deploy under the repo's Deployments section. Set the
     # SITE_URL repository variable to link to the live site from there.
