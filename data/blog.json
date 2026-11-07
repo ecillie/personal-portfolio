@@ -1,0 +1,75 @@
+[
+  {
+    "slug": "lcc-withdrawal-airfares",
+    "title": "How Low-Cost Carrier Withdrawal Affects Airfares in U.S. Domestic Markets",
+    "date": "2026-03-01",
+    "authors": [
+      "Evan Cillie"
+    ],
+    "description": "Union College economics honors thesis examining how low-cost carrier exits affect competition and pricing. Uses DOT DB1B fare data and a difference-in-differences model to estimate a 7.15% increase in fares on Albany routes following a carrier's exit.",
+    "topics": [
+      "Aviation",
+      "Economics",
+      "Research"
+    ],
+    "skills": [
+      "Difference-in-differences",
+      "Fixed-effects regression",
+      "Event study analysis",
+      "Panel data analysis",
+      "DOT DB1B fare analysis",
+      "Python",
+      "Matplotlib",
+      "pandas"
+    ],
+    "pdf": "Evan_Cille_Thesis_Final.pdf"
+  },
+  {
+    "slug": "commercial-aviation-industry-report",
+    "title": "Industry Report: U.S. Commercial Aviation",
+    "date": "2026-03-05",
+    "authors": [
+      "Evan Cillie",
+      "Jacob Jeannette",
+      "Parker Lindeaur"
+    ],
+    "description": "Examines competition in the U.S. domestic airline industry through an industrial organization framework. Analyzes market concentration, airline cost structures, and regulation to assess how consolidation shapes competition.",
+    "topics": [
+      "Aviation",
+      "Economics"
+    ],
+    "skills": [
+      "Industrial organization",
+      "Market concentration analysis (HHI)",
+      "Competitive analysis",
+      "Cost structure analysis",
+      "DOT DB1B fare analysis"
+    ],
+    "pdf": "IO_Industry_Report.pdf"
+  },
+  {
+    "slug": "nhl-contract-year-performance",
+    "title": "Do NHL Players Outperform in Contract Years?",
+    "date": "2025-06-10",
+    "authors": [
+      "Brandon Buhr",
+      "Evan Cillie",
+      "Kyle Chauvette"
+    ],
+    "description": "Investigates whether NHL players perform better in the final year of their contracts. Uses fixed-effects regressions on skater and goalie panel data from 2008–2024, finding no statistically significant evidence of a contract-year performance increase.",
+    "topics": [
+      "Hockey Analytics",
+      "Economics",
+      "Research"
+    ],
+    "skills": [
+      "Python",
+      "pandas",
+      "Stata",
+      "Fixed-effects regression",
+      "Panel data analysis",
+      "Hypothesis testing"
+    ],
+    "pdf": "Final_Paper_ECO_353.pdf"
+  }
+]

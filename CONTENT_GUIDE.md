@@ -9,6 +9,7 @@ This project keeps editable content separate from layout code so any LLM—or a 
 - **Resume list:** `data/resumes.ts`
 - **Resume PDF files:** `public/resumes/`
 - **Experience timeline:** `data/experience.ts`
+- **Blog posts:** `data/blog.json` (PDF files go in `public/blog/`)
 
 ## Updating a featured project
 
@@ -36,6 +37,29 @@ If a project stack is architectural rather than implemented, set `technologyLabe
 1. Copy a PDF into `public/resumes/`.
 2. Add an entry with the exact filename to `data/resumes.ts`.
 3. The Resume tab automatically adds a selectable preview and download link for each PDF.
+
+## Adding blog posts
+
+Every post is one entry in `data/blog.json`. Posts appear newest first on `/blog`; clicking a title opens `/blog/<slug>`.
+
+```json
+{
+  "slug": "my-post-title",
+  "title": "My post title",
+  "date": "2026-11-06",
+  "authors": ["Evan Cillie"],
+  "description": "One or two sentences shown on the Blog page before someone clicks in.",
+  "topics": ["Aviation", "Research"],
+  "skills": ["Python", "pandas"],
+  "pdf": "my-post.pdf"
+}
+```
+
+- **PDF post:** copy the file into `public/blog/` and set `"pdf"` to its exact filename.
+- **Text post:** replace `"pdf"` with `"body"`, a list of blocks: a plain string is a paragraph, `{ "heading": "..." }` starts a section, and `{ "list": ["...", "..."] }` is a bulleted list.
+- `topics` power the filter buttons on the Blog page; `skills` show as technical-skill tags.
+- Add `"draft": true` to preview a post with `npm run dev` without publishing it.
+- `npm test` checks every entry (unique slugs, required fields, PDF file exists).
 
 ## Prompt for another LLM
 
