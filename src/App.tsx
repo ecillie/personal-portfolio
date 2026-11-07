@@ -1,17 +1,26 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { lazy, Suspense, useEffect, useRef, useState, type ReactNode } from 'react';
 import { Link, Navigate, Route, Routes, useLocation, useParams } from 'react-router-dom';
+import { blogPosts, blogTopics, formatBlogDate, type BlogBlock, type BlogPost } from '@/data/blog';
 import { experience, type ExperienceItem } from '@/data/experience';
 import { otherProjects, projects, type Project } from '@/data/projects';
 import { resumes } from '@/data/resumes';
 import { profileLinks, siteContent } from '@/data/site';
 
+const PdfViewer = lazy(() => import('./PdfViewer'));
+
 const homeNavigation = [
-  { label: 'Experience', hash: '#experience' },
-  { label: 'Projects', hash: '#projects' },
-  { label: 'Skills', hash: '#skills' },
-  { label: 'About', hash: '#about' },
-  { label: 'Contact', hash: '#contact' },
+  { label: 'Experience', to: '/#experience' },
+  { label: 'Projects', to: '/#projects' },
+  { label: 'Skills', to: '/#skills' },
+  { label: 'Blog', to: '/blog' },
+  { label: 'About', to: '/#about' },
+  { label: 'Contact', to: '/#contact' },
 ];
+
+function isCurrentNavigation(to: string, pathname: string, hash: string) {
+  const [path, anchor] = to.split('#');
+  return anchor ? pathname === path && hash === `#${anchor}` : pathname === to || pathname.startsWith(`${to}/`);
+}
 
 function SiteHeader() {
   const location = useLocation();
@@ -27,9 +36,9 @@ function SiteHeader() {
       <nav className="desktop-nav" aria-label="Primary navigation">
         {homeNavigation.map((item) => (
           <Link
-            to={`/${item.hash}`}
-            aria-current={location.pathname === '/' && location.hash === item.hash ? 'location' : undefined}
-            key={item.hash}
+            to={item.to}
+            aria-current={isCurrentNavigation(item.to, location.pathname, location.hash) ? 'location' : undefined}
+            key={item.to}
           >
             {item.label}
           </Link>
@@ -52,7 +61,7 @@ function SiteHeader() {
       {menuOpen ? (
         <nav className="mobile-nav" id="mobile-navigation" aria-label="Mobile navigation">
           {homeNavigation.map((item) => (
-            <Link to={`/${item.hash}`} key={item.hash}>{item.label}</Link>
+            <Link to={item.to} key={item.to}>{item.label}</Link>
           ))}
           <Link className="mobile-resume" to={profileLinks.resume}>Resume ↗</Link>
         </nav>
@@ -67,6 +76,7 @@ function SiteFooter() {
       <p>© {new Date().getFullYear()} {siteContent.name}</p>
       <nav aria-label="Footer navigation">
         <Link to={profileLinks.resume}>Resume</Link>
+        <Link to="/blog">Blog</Link>
         <a href={profileLinks.github} target="_blank" rel="noreferrer">GitHub ↗</a>
         <a href={profileLinks.linkedin} target="_blank" rel="noreferrer">LinkedIn ↗</a>
         <a href={profileLinks.email}>Contact</a>
@@ -534,6 +544,111 @@ function ResumePage() {
   );
 }
 
+function BlogByline({ post }: { post: BlogPost }) {
+  return (
+    <p className="blog-byline">
+      <span>{post.authors.join(', ')}</span>
+      <time dateTime={post.date}>{formatBlogDate(post.date)}</time>
+      <span>{post.pdf ? 'PDF' : 'Article'}</span>
+    </p>
+  );
+}
+
+function BlogPage() {
+  const [topic, setTopic] = useState<string>();
+  const visiblePosts = topic ? blogPosts.filter((post) => post.topics.includes(topic)) : blogPosts;
+  return (
+    <PageFrame>
+      <PageIntro kicker="Blog" title="Notes, papers, and write-ups.">
+        <p>Articles and PDFs on the problems I&apos;m working through. Each post lists its authors and the technical skills involved—open one to read it in full.</p>
+      </PageIntro>
+      <section className="blog-list shell" aria-label="Blog posts">
+        {blogTopics.length > 1 ? (
+          <nav className="blog-filters" aria-label="Filter posts by topic">
+            <button type="button" aria-pressed={!topic} className={!topic ? 'is-selected' : ''} onClick={() => setTopic(undefined)}>All</button>
+            {blogTopics.map((item) => (
+              <button type="button" aria-pressed={topic === item} className={topic === item ? 'is-selected' : ''} onClick={() => setTopic(item)} key={item}>{item}</button>
+            ))}
+          </nav>
+        ) : null}
+        {visiblePosts.length === 0 ? <p className="blog-empty">No posts yet—check back soon.</p> : null}
+        <div className="blog-grid">
+          {visiblePosts.map((post) => (
+            <article className="blog-card" data-log-section={post.title} key={post.slug}>
+              <div className="project-focus" aria-label="Topics">{post.topics.map((item) => <span key={item}>{item}</span>)}</div>
+              <h2><Link to={`/blog/${post.slug}`}>{post.title}</Link></h2>
+              <BlogByline post={post} />
+              <p className="blog-description">{post.description}</p>
+              <TechList items={post.skills} label="Technical skills" />
+            </article>
+          ))}
+        </div>
+      </section>
+    </PageFrame>
+  );
+}
+
+function BlogBody({ blocks }: { blocks: BlogBlock[] }) {
+  return (
+    <div className="blog-body">
+      {blocks.map((block, index) => {
+        if (typeof block === 'string') return <p key={index}>{block}</p>;
+        if ('heading' in block) return <h2 key={index}>{block.heading}</h2>;
+        return <ul key={index}>{block.list.map((item) => <li key={item}>{item}</li>)}</ul>;
+      })}
+    </div>
+  );
+}
+
+function BlogPostPage() {
+  const { slug } = useParams();
+  const post = blogPosts.find((item) => item.slug === slug);
+  if (!post) return <Navigate to="/404" replace />;
+
+  return (
+    <PageFrame>
+      <section className="case-hero shell">
+        <div className="case-heading">
+          <Link className="back-link" to="/blog">← Back to Blog</Link>
+          <div className="project-focus">{post.topics.map((item) => <span key={item}>{item}</span>)}</div>
+          <h1 className="blog-title">{post.title}</h1>
+          <p className="case-summary">{post.description}</p>
+        </div>
+        <aside className="case-fast-facts" aria-label={`${post.title} details`}>
+          <div className="case-status">
+            <p className="fact-label">{post.authors.length > 1 ? 'Authors' : 'Author'}</p>
+            <p>{post.authors.join(', ')}</p>
+          </div>
+          <div>
+            <p className="fact-label">Published</p>
+            <p><time dateTime={post.date}>{formatBlogDate(post.date)}</time></p>
+          </div>
+          <TechList items={post.skills} label="Technical skills" className="case-technologies" />
+        </aside>
+      </section>
+      <section className="blog-content shell">
+        {post.body ? (
+          <BlogBody blocks={post.body} />
+        ) : (
+          <>
+            <div className="blog-pdf-actions">
+              <a className="text-link" href={`/blog/${post.pdf}`} target="_blank" rel="noreferrer">Open in new tab <span aria-hidden="true">↗</span></a>
+              <a className="text-link" href={`/blog/${post.pdf}`} data-log-label={`Download ${post.title} PDF`} download>Download PDF <span aria-hidden="true">↓</span></a>
+            </div>
+            <Suspense fallback={<div className="pdf-viewer"><p className="pdf-loading">Loading PDF…</p></div>}>
+              <PdfViewer src={`/blog/${post.pdf}`} title={post.title} />
+            </Suspense>
+          </>
+        )}
+      </section>
+      <nav className="case-next shell" aria-label="Blog navigation">
+        <p className="kicker">Keep reading</p>
+        <Link to="/blog">Back to all posts <span aria-hidden="true">→</span></Link>
+      </nav>
+    </PageFrame>
+  );
+}
+
 function ContactPage() {
   const links = [
     { label: 'Email', value: profileLinks.emailLabel, href: profileLinks.email, internal: false },
@@ -580,12 +695,14 @@ function RouteEffects() {
     const pathnameChanged = previousPathname.current !== location.pathname;
     previousPathname.current = location.pathname;
     const project = projects.find((item) => location.pathname === `/projects/${item.slug}`);
+    const post = blogPosts.find((item) => location.pathname === `/blog/${item.slug}`);
     const labels: Record<string, string> = {
       '/': `${siteContent.name} — ${siteContent.heroRole}`,
       '/about': `About — ${siteContent.name}`,
       '/projects': `Projects — ${siteContent.name}`,
       '/experience': `Experience — ${siteContent.name}`,
       '/resume': `Resumes — ${siteContent.name}`,
+      '/blog': `Blog — ${siteContent.name}`,
       '/contact': `Contact — ${siteContent.name}`,
     };
     const descriptions: Record<string, string> = {
@@ -594,10 +711,12 @@ function RouteEffects() {
       '/projects': 'Software engineering, aviation, economics research, machine learning, and hockey analytics projects by Evan Cillie.',
       '/experience': 'Evan Cillie’s software engineering, aviation operations, and interdisciplinary academic experience.',
       '/resume': 'View and download Evan Cillie’s general and aviation resumes.',
+      '/blog': 'Articles, papers, and write-ups by Evan Cillie on software, data, aviation, and research.',
       '/contact': `Contact ${siteContent.name} and find his GitHub, LinkedIn, and resume.`,
     };
-    const title = project ? `${project.title} — ${siteContent.name}` : labels[location.pathname] ?? `Page not found — ${siteContent.name}`;
-    const description = project?.shortDescription ?? descriptions[location.pathname] ?? siteContent.shortBio;
+    const entryTitle = project?.title ?? post?.title;
+    const title = entryTitle ? `${entryTitle} — ${siteContent.name}` : labels[location.pathname] ?? `Page not found — ${siteContent.name}`;
+    const description = project?.shortDescription ?? post?.description ?? descriptions[location.pathname] ?? siteContent.shortBio;
     document.title = title;
     document.querySelector('meta[name="description"]')?.setAttribute('content', description);
     document.querySelector('meta[property="og:title"]')?.setAttribute('content', title);
@@ -627,6 +746,8 @@ export default function App() {
         <Route path="/projects/:slug" element={<ProjectPage />} />
         <Route path="/experience" element={<ExperiencePage />} />
         <Route path="/resume" element={<ResumePage />} />
+        <Route path="/blog" element={<BlogPage />} />
+        <Route path="/blog/:slug" element={<BlogPostPage />} />
         <Route path="/contact" element={<ContactPage />} />
         <Route path="*" element={<NotFoundPage />} />
       </Routes>

@@ -327,6 +327,44 @@ section[id] { scroll-margin-top: 92px; }
 .resume-preview { flex: 1 1 auto; min-height: 0; margin-top: 15px; overflow: hidden; border: 1px solid var(--line); background: #ddd; }
 .resume-frame { display: block; width: 100%; height: 100%; border: 0; background: #ddd; }
 
+.blog-list { padding: 56px 0 105px; }
+.blog-filters { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 26px; }
+.blog-filters button { min-height: 34px; padding: 7px 12px; border: 1px solid var(--ink); background: transparent; cursor: pointer; font-size: .68rem; font-weight: 680; transition: background .18s ease; }
+.blog-filters button:hover { background: rgba(216, 255, 79, .35); }
+.blog-filters button.is-selected { background: var(--acid); }
+.blog-empty { color: var(--muted); }
+.blog-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); border-top: 1px solid var(--ink); border-left: 1px solid var(--line); }
+.blog-card { display: flex; flex-direction: column; padding: 26px; border-right: 1px solid var(--line); border-bottom: 1px solid var(--line); transition: background .18s ease; }
+.blog-card:hover { background: rgba(255, 255, 255, .6); }
+.blog-card h2 { margin: 38px 0 12px; font-size: clamp(1.45rem, 2.4vw, 2.1rem); line-height: 1.06; letter-spacing: -.045em; }
+.blog-card h2 a:hover { text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 5px; }
+.blog-byline { display: flex; flex-wrap: wrap; gap: 6px 16px; margin: 0; color: var(--muted); font: .64rem var(--font-geist-mono); }
+.blog-byline span:first-child { color: var(--ink); }
+.blog-description { margin: 18px 0 0; color: var(--muted); font-size: .86rem; line-height: 1.6; }
+.blog-card .tech-block { margin-top: auto; padding-top: 22px; }
+.case-hero h1.blog-title { font-size: clamp(2.6rem, 5vw, 4.8rem); }
+.blog-content { padding: 30px 0 80px; border-top: 1px solid var(--line); }
+.blog-body { max-width: 720px; }
+.blog-body h2 { margin: 42px 0 15px; font-size: clamp(1.45rem, 2.4vw, 2.1rem); line-height: 1.1; letter-spacing: -.04em; }
+.blog-body h2:first-child { margin-top: 10px; }
+.blog-body p { margin: 0 0 22px; color: var(--muted); font-size: 1.02rem; line-height: 1.72; }
+.blog-body ul { display: grid; gap: 12px; margin: 0 0 24px; padding: 0; list-style: none; }
+.blog-body li { position: relative; padding-left: 22px; color: var(--muted); line-height: 1.62; }
+.blog-body li::before { content: '↳'; position: absolute; left: 0; color: var(--ink); font-weight: 800; }
+.blog-pdf-actions { display: flex; flex-wrap: wrap; gap: 26px; margin-bottom: 15px; }
+.pdf-viewer { max-width: 1000px; margin: 0 auto; scroll-margin-top: 76px; }
+.pdf-controls { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 16px; padding: 6px 0; border-bottom: 1px solid var(--line); }
+.pdf-controls p { margin: 0; text-align: center; color: var(--muted); font: .7rem var(--font-geist-mono); }
+.pdf-controls strong { color: var(--ink); }
+.pdf-controls button { display: inline-flex; align-items: center; gap: 10px; min-height: 34px; padding: 6px 14px; border: 1px solid var(--ink); background: transparent; cursor: pointer; font-size: .72rem; font-weight: 700; transition: background .18s ease; }
+.pdf-controls button:hover:not(:disabled) { background: var(--acid); }
+.pdf-controls button:disabled { opacity: .35; cursor: default; }
+.pdf-stage { width: fit-content; min-width: min(100%, 320px); margin: 10px auto 0; border: 1px solid var(--line); background: white; box-shadow: 0 18px 40px rgba(23, 25, 20, .08); }
+.pdf-stage canvas { display: block; cursor: pointer; }
+.pdf-loading, .pdf-error { margin: 0; padding: 60px 20px; color: var(--muted); text-align: center; }
+.pdf-progress { height: 3px; margin-top: 8px; background: var(--line); }
+.pdf-progress span { display: block; height: 100%; background: var(--ink); transition: width .2s ease; }
+
 .contact-layout { display: grid; grid-template-columns: 1fr 1fr; gap: 70px; padding: 65px 0 95px; }
 .contact-card { border-top: 1px solid var(--ink); }
 .contact-card .kicker { margin: 22px 0 42px; }
@@ -444,6 +482,9 @@ section[id] { scroll-margin-top: 92px; }
   .next-cta h2 { font-size: 2.65rem; }
   .other-projects { padding: 65px 0 80px; }
   .other-project-grid { grid-template-columns: 1fr; }
+  .blog-grid { grid-template-columns: 1fr; }
+  .blog-card { padding: 22px 20px; }
+  .pdf-controls button { padding-inline: 12px; }
   .other-project-card { min-height: 255px; }
   .case-hero { gap: 35px; }
   .back-link { margin-bottom: 36px; }
