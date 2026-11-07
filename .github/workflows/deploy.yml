@@ -72,8 +72,11 @@ jobs:
       url: ${{ vars.SITE_URL }}
     env:
       SSH_USER: ${{ vars.SSH_USER || 'ubuntu' }}
-      # The git clone on the server that the site is built and served from.
+      # The git clone on the server that the site is built in.
       DEPLOY_PATH: ${{ vars.DEPLOY_PATH || '/home/ubuntu/personal-portfolio' }}
+      # The directory nginx serves. When unset, it is read from the `root`
+      # directive in the server's nginx config.
+      WEB_ROOT: ${{ vars.WEB_ROOT }}
       SHA: ${{ needs.automerge.outputs.sha }}
     steps:
       - name: Configure SSH
@@ -106,6 +109,59 @@ jobs:
           if [ -s "$keep" ]; then cp "$keep" dist/logging-config.json; fi
           rm -f "$keep"
           EOF
+
+      - name: Publish build to web root
+        env:
+          IP_ADDRESS: ${{ secrets.IP_ADDRESS }}
+        run: |
+          ssh -i ~/.ssh/deploy_key "$SSH_USER@$IP_ADDRESS" bash -s -- "$DEPLOY_PATH" "$WEB_ROOT" <<'EOF'
+          set -euo pipefail
+          dist="$1/dist"
+          root="$2"
+          if [ -z "$root" ]; then
+            roots=$(sudo -n nginx -T 2>/dev/null \
+              | sed -n 's/^[[:space:]]*root[[:space:]]\{1,\}\([^;[:space:]]*\)[[:space:]]*;.*/\1/p' | sort -u)
+            if [ "$(printf '%s\n' "$roots" | grep -c .)" -ne 1 ]; then
+              echo "Expected one nginx root, found: ${roots:-none}." >&2
+              echo "Set the WEB_ROOT repository variable to the directory nginx serves." >&2
+              exit 1
+            fi
+            root=$roots
+          fi
+          root=${root%/}
+          if [ "$(realpath "$root")" = "$(realpath "$dist")" ]; then
+            echo "nginx already serves $dist"
+            exit 0
+          fi
+          # Refuse to sync into a directory that is not already the live site,
+          # since --delete would empty it.
+          if [ ! -f "$root/index.html" ]; then
+            echo "$root has no index.html; refusing to overwrite it." >&2
+            exit 1
+          fi
+          echo "Publishing $dist to $root"
+          # logging-config.json is edited in the web root, so only copy it
+          # there the first time and never overwrite or delete it afterwards.
+          sudo -n rsync -a --delete --exclude logging-config.json "$dist/" "$root/"
+          if [ ! -f "$root/logging-config.json" ]; then
+            sudo -n cp "$dist/logging-config.json" "$root/"
+          fi
+          EOF
+
+      - name: Check live site
+        env:
+          IP_ADDRESS: ${{ secrets.IP_ADDRESS }}
+          SITE_URL: ${{ vars.SITE_URL }}
+        run: |
+          url=${SITE_URL:-http://$IP_ADDRESS/}
+          ssh -i ~/.ssh/deploy_key "$SSH_USER@$IP_ADDRESS" cat "$DEPLOY_PATH/dist/index.html" > built.html
+          curl -fsSL --retry 3 -H 'Cache-Control: no-cache' "$url" > live.html
+          if ! cmp -s built.html live.html; then
+            echo "$url is not serving the new build." >&2
+            diff built.html live.html >&2 || true
+            exit 1
+          fi
+          echo "$url is serving the new build."
 
       - name: Clean up key
         if: always()
