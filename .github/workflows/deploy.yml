@@ -117,7 +117,8 @@ jobs:
           ssh -i ~/.ssh/deploy_key "$SSH_USER@$IP_ADDRESS" bash -s -- "$DEPLOY_PATH" "$WEB_ROOT" <<'EOF'
           set -euo pipefail
           dist="$1/dist"
-          root="$2"
+          # ssh drops an empty WEB_ROOT argument, so $2 may be unset.
+          root="${2:-}"
           if [ -z "$root" ]; then
             roots=$(sudo -n nginx -T 2>/dev/null \
               | sed -n 's/^[[:space:]]*root[[:space:]]\{1,\}\([^;[:space:]]*\)[[:space:]]*;.*/\1/p' | sort -u)
